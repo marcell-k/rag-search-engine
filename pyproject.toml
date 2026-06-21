@@ -4,4 +4,40 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "basedpyright>=1.39.8",
+    "nltk>=3.9.4",
+    "ruff>=0.15.18",
+]
+
+[project.scripts]
+movie-search = "cli.keyword_search_cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["cli"]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "ANN", "B", "D", "E", "F", "I", "RUF", "S", "SIM", "UP",
+    "C4", "FA", "ICN", "ISC", "NPY", "PTH", "TC", "TID", "W"
+]
+ignore = ["ANN401", "D100", "D101", "D102", "D103", "D104", "D107", "D203", "D213", "D212", "D205", "S101"]
+
+# --- Basedpyright configuration goes here ---
+[tool.basedpyright]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+exclude=[".venv", ".git", "__pycache__"]
+
