@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv
 
-/data/
+data/
+cache/
 uv.lock
 .ruff_cache
