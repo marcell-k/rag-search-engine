@@ -1,7 +1,33 @@
 import argparse
+import math
 
-from cli.lib.keyword_search import search_command
-from cli.lib.utils import InvertedIndex, build_command, idf_command, tf_command, tfidf_command
+from rag_engine.index import InvertedIndex
+from rag_engine.preprocessing import tokenize_first_term
+from rag_engine.search import search_command
+
+
+def build_command() -> None:
+    ii = InvertedIndex()
+    ii.build()
+    ii.save()
+
+
+def tf_command(ii: InvertedIndex, doc_id: int, term: str) -> int:
+    return ii.get_tf(doc_id, term)
+
+
+def idf_command(ii: InvertedIndex, term: str) -> float:
+    token = tokenize_first_term(term)
+    term_match_doc_count = len(ii.get_documents(token))
+    total_doc_count = len(ii.docmap)
+    idf_value = math.log((total_doc_count + 1) / (term_match_doc_count + 1))
+    return idf_value
+
+
+def tfidf_command(ii: InvertedIndex, doc_id: int, term: str) -> float:
+    idf_value = idf_command(ii, term)
+    tf_value = tf_command(ii, doc_id, term)
+    return idf_value * tf_value
 
 
 def main() -> None:
@@ -32,18 +58,21 @@ def main() -> None:
     match args.command:
         case "search":
             print(f"Searching for: {args.query}")
-            results = search_command(args.query)
+            results = search_command(ii, args.query)
             for i, res in enumerate(results, start=1):
                 print(f"{i}. {res['title']}")
 
         case "build":
             build_command()
+
         case "tf":
             tf = tf_command(ii, args.doc_id, args.term)
             print(tf)
+
         case "idf":
             idf = idf_command(ii, args.term)
             print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
+
         case "tfidf":
             tf_idf = tfidf_command(ii, args.doc_id, args.term)
             print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")

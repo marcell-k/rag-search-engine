@@ -55,9 +55,7 @@ def _match_rule(rel_path: str, is_dir: bool, rule: GitIgnoreRule) -> bool:
         return any(fnmatch.fnmatch(part, pattern) for part in parts)
     if fnmatch.fnmatch(rel_path, pattern):
         return True
-    if rule.directory_only and rel_path.startswith(pattern + "/"):
-        return True
-    return False
+    return rule.directory_only and rel_path.startswith(pattern + "/")
 
 
 def is_ignored(path: Path, base: Path, rules: list[GitIgnoreRule], *, is_dir: bool) -> bool:
@@ -136,7 +134,7 @@ def export_to_markdown(source_dir: Path, output_md: Path) -> None:
                     f.write(f"> Error reading file: {e}\n\n")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Consolidate folder into Markdown, excluding specific paths and honoring .gitignore"
     )
