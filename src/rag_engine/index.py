@@ -1,11 +1,10 @@
-import json
 import math
 import pickle
 from collections import Counter, defaultdict
-from functools import lru_cache
 from pathlib import Path
 from typing import TypedDict
 
+from rag_engine.data_loader import load_data
 from rag_engine.preprocessing import tokenizer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -101,17 +100,3 @@ class InvertedIndex:
             self.doc_lengths = pickle.load(f)  # noqa: S301
         if self.doc_lengths:
             self.avg_doc_length = sum(self.doc_lengths.values()) / len(self.doc_lengths)
-
-
-@lru_cache(maxsize=1)
-def load_data() -> list[Movie]:
-    with Path(DATA_PATH).open() as f:
-        data = json.load(f)
-        return data["movies"]
-
-
-@lru_cache(maxsize=1)
-def load_stop_words() -> set[str]:
-    with Path(STOP_WORDS).open() as f:
-        words = f.read().splitlines()
-    return set(words)

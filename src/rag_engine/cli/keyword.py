@@ -2,8 +2,8 @@ import argparse
 import math
 
 from rag_engine.index import InvertedIndex
+from rag_engine.keyword.search import bm25_search, search_command
 from rag_engine.preprocessing import tokenize_first_term
-from rag_engine.search import bm25_search, search_command
 
 
 def build_command() -> None:

@@ -7,7 +7,9 @@ requires-python = ">=3.14"
 dependencies = [
     "basedpyright>=1.39.8",
     "nltk>=3.9.4",
+    "numpy>=2.5.0",
     "ruff>=0.15.18",
+    "sentence-transformers>=5.6.0",
 ]
 
 [build-system]
@@ -18,7 +20,8 @@ build-backend = "setuptools.build_meta"
 packages = { find = { where = ["src"] } }
 
 [project.scripts]
-movie-search = "rag_engine.cli:main"
+keyword  = "rag_engine.cli.keyword:main"
+semantic = "rag_engine.cli.semantic:main"
 
 [tool.uv]
 package = true
@@ -38,6 +41,7 @@ ignore = ["ANN401", "D100", "D101", "D102", "D103", "D104", "D107", "D203", "D21
 [tool.basedpyright]
 typeCheckingMode = "standard"
 venvPath = "."
+extraPaths=["src"]
 venv = ".venv"
-exclude=[".venv", ".git", "__pycache__"]
-
+exclude=[".venv", ".git", "__pycache__", "data", "cache", ".ruff_cache"]
+useLibraryCodeForTypes = false
