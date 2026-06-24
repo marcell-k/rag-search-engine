@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from rag_engine.config import MOVIES_FILE, STOPWORDS_FILE
 
 if TYPE_CHECKING:
-    from rag_engine.index import Movie
+    from rag_engine.models import Movie
 
 
 @lru_cache(maxsize=1)

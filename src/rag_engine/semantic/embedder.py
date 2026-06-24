@@ -1,5 +1,4 @@
 import json
-from collections import defaultdict
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -9,7 +8,7 @@ from rag_engine.data_loader import load_data
 from rag_engine.semantic.vector_db import VectorDB, cosine_similarity
 
 if TYPE_CHECKING:
-    from rag_engine.index import Movie
+    from rag_engine.models import Movie, SearchResult
 
 
 class SemanticSearch:
@@ -75,7 +74,7 @@ class ChunkedSemanticSearch(SemanticSearch):
 
     def build_chunk_embeddings(self, documents: list[Movie]) -> np.ndarray:
         from rag_engine.config import CACHE_DIR
-        from rag_engine.semantic.semantic_search import semantic_chunking
+        from rag_engine.semantic.search import semantic_chunking
 
         self.documents = documents
         self.document_map = {}
@@ -123,7 +122,7 @@ class ChunkedSemanticSearch(SemanticSearch):
 
         return self.build_chunk_embeddings(documents)
 
-    def search_chunks(self, query: str, limit: int = 5) -> list[dict]:
+    def search_chunks(self, query: str, limit: int = 5) -> list[SearchResult]:
         if self.chunk_embeddings is None or not self.chunk_metadata:
             return []
 
@@ -145,11 +144,10 @@ class ChunkedSemanticSearch(SemanticSearch):
 
             results.append(
                 {
+                    "doc_id": doc["id"],
                     "score": float(similarities[idx]),
                     "title": doc["title"],
                     "description": doc["description"],
-                    "chunk_idx": metadata["chunk_idx"],
-                    "total_chunks": metadata["total_chunks"],
                 }
             )
 

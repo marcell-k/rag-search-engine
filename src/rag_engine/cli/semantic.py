@@ -2,7 +2,7 @@ import argparse
 
 from rag_engine.data_loader import load_data
 from rag_engine.semantic.embedder import ChunkedSemanticSearch, SemanticSearch, verify_embeddings, verify_model
-from rag_engine.semantic.semantic_search import (
+from rag_engine.semantic.search import (
     embed_query,
     embed_text,
     fixed_size_chunking,
@@ -68,7 +68,6 @@ def main() -> None:
 
         case "search":
             search(ss, args.query, args.limit)
-
         case "chunk":
             chunks = fixed_size_chunking(args.text, args.chunk_size, args.overlap)
             print(f"Chunking {len(args.text)} characters")

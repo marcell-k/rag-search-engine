@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING
 from rag_engine.preprocessing import tokenizer
 
 if TYPE_CHECKING:
-    from rag_engine.index import InvertedIndex, Movie
+    from rag_engine.index import InvertedIndex
+    from rag_engine.models import Movie, SearchResult
 
 
 def search_command(ii: InvertedIndex, query: str, n_results: int = 5) -> list[Movie]:
@@ -23,7 +24,7 @@ def search_command(ii: InvertedIndex, query: str, n_results: int = 5) -> list[Mo
     return res
 
 
-def bm25_search(ii: InvertedIndex, query: str, limit: int) -> list[tuple[float, Movie]]:
+def bm25_search(ii: InvertedIndex, query: str, limit: int) -> list[SearchResult]:
     scores: dict[int, float] = defaultdict(float)
     query_tokens = tokenizer(query)
     for token in query_tokens:
@@ -34,4 +35,18 @@ def bm25_search(ii: InvertedIndex, query: str, limit: int) -> list[tuple[float, 
     if not scores:
         return []
     sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    return [(score, ii.docmap[doc_id]) for doc_id, score in sorted_docs[:limit]]
+    results: list[SearchResult] = []
+
+    for doc_id, score in sorted_docs[:limit]:
+        doc = ii.docmap[doc_id]
+
+        results.append(
+            {
+                "doc_id": doc_id,
+                "score": score,
+                "title": doc["title"],
+                "description": doc["description"],
+            }
+        )
+
+    return results

@@ -2,10 +2,13 @@ import math
 import pickle
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import TypedDict
+from typing import TYPE_CHECKING
 
 from rag_engine.data_loader import load_data
 from rag_engine.preprocessing import tokenizer
+
+if TYPE_CHECKING:
+    from rag_engine.models import Movie
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = PROJECT_ROOT / "data" / "movies.json"
@@ -13,12 +16,6 @@ STOP_WORDS = PROJECT_ROOT / "data" / "stopwords.txt"
 
 BM25_K1 = 1.5
 BM25_B = 0.75
-
-
-class Movie(TypedDict):
-    id: int
-    title: str
-    description: str
 
 
 class InvertedIndex:
