@@ -13,3 +13,6 @@ data/
 cache/
 uv.lock
 .ruff_cache
+
+.env
+.DS_Store

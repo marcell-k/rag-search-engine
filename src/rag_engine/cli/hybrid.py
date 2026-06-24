@@ -1,8 +1,13 @@
 import argparse
+import os
+
+from dotenv import load_dotenv
+from google import genai
 
 from rag_engine.data_loader import load_data
 from rag_engine.hybrid.search import HybridSearch, minmax_normalization
 from rag_engine.index import InvertedIndex
+from rag_engine.query_processing.rewriter import QueryRewriter
 from rag_engine.semantic.embedder import ChunkedSemanticSearch
 
 
@@ -26,6 +31,7 @@ def main() -> None:
     rrf_search_parser.add_argument("query", type=str, help="User query")
     rrf_search_parser.add_argument("-k", type=int, default=60)
     rrf_search_parser.add_argument("--limit", type=int, default=5)
+    rrf_search_parser.add_argument("--enhance", type=str, choices=["spell"], help="Query enhancement method")
 
     args = parser.parse_args()
 
@@ -40,6 +46,13 @@ def main() -> None:
     css.load_or_create_chunk_embeddings(documents)
     hs = HybridSearch(inverted_index=ii, semantic_search=css)
 
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    rewriter = None
+    if api_key:
+        client = genai.Client(api_key=api_key)
+        rewriter = QueryRewriter(client=client)
+
     match args.command:
         case "weighted-search":
             documents = load_data()
@@ -49,9 +62,16 @@ def main() -> None:
                 print(f"  Hybrid Score: {res['hybrid_score']:.4f}")
                 print(f"  BM25: {res['bm_score']:.4f}, Semantic: {res['sem_score']:.4f}")
                 print(f"  {res['description'][:40]}")
+
         case "rrf-search":
-            documents = load_data()
-            results = hs.rrf_search(args.query, args.k, args.limit)
+            search_query = args.query
+            if args.enhance == "spell" and rewriter:
+                search_query = rewriter.rewrite(args.query)
+                if search_query != args.query:
+                    print(f"Enhanced query (spell): '{args.query}' -> '{search_query}'\n")
+
+            results = hs.rrf_search(search_query, args.k, args.limit)
+
             for i, res in enumerate(results, start=1):
                 print(f"{i} {res['title']}")
                 print(f"  RRF Score: {res['hybrid_score']:.4f}")
