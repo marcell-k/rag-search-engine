@@ -7,6 +7,7 @@ from google import genai
 from rag_engine.data_loader import load_data
 from rag_engine.hybrid.search import HybridSearch, minmax_normalization
 from rag_engine.index import InvertedIndex
+from rag_engine.query_processing.reranker import SearchReranker
 from rag_engine.query_processing.rewriter import QueryRewriter
 from rag_engine.semantic.embedder import ChunkedSemanticSearch
 
@@ -34,6 +35,9 @@ def main() -> None:
     rrf_search_parser.add_argument(
         "--enhance", type=str, choices=["spell", "rewrite", "expand"], help="Query enhancement method"
     )
+    rrf_search_parser.add_argument(
+        "--rerank-method", choices=["individual", "batch", "cross_encoder"], help="Rerank method"
+    )
 
     args = parser.parse_args()
 
@@ -43,16 +47,18 @@ def main() -> None:
     if not ii._index_file.exists():
         ii.build()
         ii.save()
+    else:
+        ii.load()
     css = ChunkedSemanticSearch()
     css.load_or_create_chunk_embeddings(documents)
     hs = HybridSearch(inverted_index=ii, semantic_search=css)
 
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
-    rewriter = None
-    if api_key:
-        client = genai.Client(api_key=api_key)
-        rewriter = QueryRewriter(client=client)
+    client = genai.Client(api_key=api_key) if api_key else None
+
+    rewriter = QueryRewriter(client=client) if client else None
+    reranker = SearchReranker(client=client)
 
     match args.command:
         case "weighted-search":
@@ -65,18 +71,38 @@ def main() -> None:
 
         case "rrf-search":
             search_query = args.query
-            if args.enhance in ["spell", "rewrite", "expand"] and rewriter:
+            if args.enhance in ["spell", "rewrite", "expand"] and rewriter and rewriter.client:
                 search_query = rewriter.rewrite(args.query, mode=args.enhance)
                 if search_query != args.query:
                     print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{search_query}'\n")
 
-            results = hs.rrf_search(search_query, args.k, args.limit)
+            initial_limit = args.limit * 5 if args.rerank_method else args.limit
+            results = hs.rrf_search(search_query, args.k, initial_limit)
 
-            for i, res in enumerate(results, start=1):
-                print(f"{i} {res['title']}")
-                print(f"  RRF Score: {res['hybrid_score']:.4f}")
-                print(f"  BM25 Rank: {res['bm_rank']}, Semantic Rank: {res['sem_rank']}")
-                print(f"  {res['description'][:30]}")
+            is_reranked = False
+            if args.rerank_method:
+                is_reranked = True
+                print(f"Re-ranking top {len(results)} results using {args.rerank_method} method...")
+                results = reranker.rerank(search_query, results, mode=args.rerank_method)
+                results = results[: args.limit]
+
+            if is_reranked:
+                print(f"Reciprocal Rank Fusion Results for '{args.query}' (k={args.k}):\n")
+
+            for i, res in enumerate(results[: args.limit], start=1):
+                print(f"{i}. {res['title']}")
+
+                # Clean, mutually exclusive printing logic for each reranking mode
+                if args.rerank_method == "individual" and "rerank_score" in res:
+                    print(f"   Re-rank Score: {res['rerank_score']:.3f}/10")
+                elif args.rerank_method == "batch":
+                    print(f"   Re-rank Rank: {i}")
+                elif args.rerank_method == "cross_encoder" and "rerank_score" in res:
+                    print(f"   Cross Encoder Score: {res['rerank_score']:.4f}")
+
+                print(f"   RRF Score: {res['hybrid_score']:.3f}")
+                print(f"   BM25 Rank: {res['bm_rank']}, Semantic Rank: {res['sem_rank']}")
+                print(f"   {res['description'][:97]}...\n")
 
         case "search":
             documents = load_data()
@@ -89,3 +115,7 @@ def main() -> None:
 
         case _:
             parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
