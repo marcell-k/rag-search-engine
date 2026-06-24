@@ -12,15 +12,15 @@ if TYPE_CHECKING:
 
 
 class SemanticSearch:
-    def __init__(self) -> None:
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
+        self.model = SentenceTransformer(model_name)
         self.vdb = VectorDB()
         self.document_map: dict[int, Movie] = {}
 
     def generate_embedding(self, text: str) -> np.ndarray:
         if not text or not text.strip():
             raise ValueError("text is empty")
-        return self.model.encode([text][0], convert_to_numpy=True)
+        return self.model.encode(text, convert_to_numpy=True)
 
     def search(self, query: str, limit: int) -> list[dict]:
         query_embedding = self.generate_embedding(query)
@@ -64,10 +64,7 @@ class SemanticSearch:
 
 class ChunkedSemanticSearch(SemanticSearch):
     def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
-        super().__init__()
-        if model_name != "all-MiniLM-L6-v2":
-            self.model = SentenceTransformer(model_name)
-
+        super().__init__(model_name)
         self.chunk_embeddings: np.ndarray | None = None
         self.chunk_metadata: list[dict] | None = None
         self.documents: list[Movie] = []

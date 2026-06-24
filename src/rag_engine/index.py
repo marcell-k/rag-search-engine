@@ -10,8 +10,7 @@ from rag_engine.preprocessing import tokenizer
 if TYPE_CHECKING:
     from rag_engine.models import Movie
 
-BM25_K1 = 1.5
-BM25_B = 0.75
+from rag_engine.config import BM25_B, BM25_K1
 
 
 class InvertedIndex:
@@ -60,6 +59,8 @@ class InvertedIndex:
         for movie in movies:
             self.__add_document(movie["id"], f"{movie['title']} {movie['description']}")
             self.docmap[movie["id"]] = movie
+        if self.doc_lengths:
+            self.avg_doc_length = sum(self.doc_lengths.values()) / len(self.doc_lengths)
 
     def save(self) -> None:
         self._cache_dir.mkdir(parents=True, exist_ok=True)

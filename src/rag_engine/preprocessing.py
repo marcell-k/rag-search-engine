@@ -1,20 +1,14 @@
 import string
-from functools import lru_cache
 from pathlib import Path
 
 from nltk.stem import PorterStemmer
+
+from rag_engine.data_loader import load_stop_words
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STOP_WORDS = PROJECT_ROOT / "data" / "stopwords.txt"
 
 stemmer = PorterStemmer()
-
-
-@lru_cache(maxsize=1)
-def load_stop_words() -> set[str]:
-    with Path(STOP_WORDS).open() as f:
-        words = f.read().splitlines()
-    return set(words)
 
 
 def clean_text(text: str) -> str:

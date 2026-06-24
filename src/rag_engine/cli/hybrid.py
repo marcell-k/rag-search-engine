@@ -41,7 +41,6 @@ def main() -> None:
     if not ii._index_file.exists():
         ii.build()
         ii.save()
-    ii.load()
     css = ChunkedSemanticSearch()
     css.load_or_create_chunk_embeddings(documents)
     hs = HybridSearch(inverted_index=ii, semantic_search=css)

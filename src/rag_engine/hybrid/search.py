@@ -15,7 +15,6 @@ class HybridSearch:
         self.semantic_search = semantic_search
 
     def _bm25_search(self, query: str, limit: int) -> list[SearchResult]:
-        self.ii.load()
         return bm25_search(self.ii, query, limit)
 
     def weighted_search(self, query: str, alpha: float, limit: int = 5) -> list[HybridSearchResult]:

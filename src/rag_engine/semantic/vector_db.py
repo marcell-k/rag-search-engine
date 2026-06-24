@@ -30,7 +30,7 @@ class VectorDB:
         if self.embeddings is None or not self.doc_ids:
             return []
 
-        similarities = cosine_similarity(query_vector, self.embeddings)
+        similarities = cosine_similarity(self.embeddings, query_vector)
 
         top_indices = np.argsort(similarities)[::-1][:limit]
 
