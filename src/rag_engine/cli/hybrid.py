@@ -31,7 +31,9 @@ def main() -> None:
     rrf_search_parser.add_argument("query", type=str, help="User query")
     rrf_search_parser.add_argument("-k", type=int, default=60)
     rrf_search_parser.add_argument("--limit", type=int, default=5)
-    rrf_search_parser.add_argument("--enhance", type=str, choices=["spell"], help="Query enhancement method")
+    rrf_search_parser.add_argument(
+        "--enhance", type=str, choices=["spell", "rewrite", "expand"], help="Query enhancement method"
+    )
 
     args = parser.parse_args()
 
@@ -54,7 +56,6 @@ def main() -> None:
 
     match args.command:
         case "weighted-search":
-            documents = load_data()
             results = hs.weighted_search(args.query, args.alpha, args.limit)
             for i, res in enumerate(results, start=1):
                 print(f"{i} {res['title']}")
@@ -64,10 +65,10 @@ def main() -> None:
 
         case "rrf-search":
             search_query = args.query
-            if args.enhance == "spell" and rewriter:
-                search_query = rewriter.rewrite(args.query)
+            if args.enhance in ["spell", "rewrite", "expand"] and rewriter:
+                search_query = rewriter.rewrite(args.query, mode=args.enhance)
                 if search_query != args.query:
-                    print(f"Enhanced query (spell): '{args.query}' -> '{search_query}'\n")
+                    print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{search_query}'\n")
 
             results = hs.rrf_search(search_query, args.k, args.limit)
 
