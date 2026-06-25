@@ -29,6 +29,7 @@ packages = { find = { where = ["src"] } }
 keyword  = "rag_engine.cli.keyword:main"
 semantic = "rag_engine.cli.semantic:main"
 hybrid = "rag_engine.cli.hybrid:main"
+evaluation = "rag_engine.cli.evaluation:main"
 
 [tool.uv]
 package = true

@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING
 
 from rag_engine.keyword.search import bm25_search
@@ -6,6 +7,8 @@ if TYPE_CHECKING:
     from rag_engine.index import InvertedIndex
     from rag_engine.models import HybridSearchResult, SearchResult
     from rag_engine.semantic.embedder import ChunkedSemanticSearch
+
+logger = logging.getLogger(__name__)
 
 
 class HybridSearch:
@@ -24,9 +27,14 @@ class HybridSearch:
         return combined_results[:limit]
 
     def rrf_search(self, query: str, k: int, limit: int = 10) -> list[HybridSearchResult]:
+        logger.debug("--- RRF pipeline ---")
         bm_results = self._bm25_search(query, limit * 500)
+        logger.debug("BM25 top 5: %s", [r["title"] for r in bm_results[:5]])
         sem_results = self.semantic_search.search_chunks(query, limit * 500)
-        return rrf_combined_results(bm_results, sem_results, k)[:limit]
+        logger.debug("Semantic top 5: %s", [r["title"] for r in sem_results[:5]])
+        results = rrf_combined_results(bm_results, sem_results, k)[:limit]
+        logger.debug("After RRF fusion: %s", [r["title"] for r in results])
+        return results
 
 
 def rrf_combined_results(

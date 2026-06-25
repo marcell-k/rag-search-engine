@@ -1,15 +1,10 @@
 import argparse
-import os
+import logging
 
-from dotenv import load_dotenv
-from google import genai
+from rag_engine.hybrid import pipeline
+from rag_engine.hybrid.search import minmax_normalization
 
-from rag_engine.data_loader import load_data
-from rag_engine.hybrid.search import HybridSearch, minmax_normalization
-from rag_engine.index import InvertedIndex
-from rag_engine.query_processing.reranker import SearchReranker
-from rag_engine.query_processing.rewriter import QueryRewriter
-from rag_engine.semantic.embedder import ChunkedSemanticSearch
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -38,31 +33,20 @@ def main() -> None:
     rrf_search_parser.add_argument(
         "--rerank-method", choices=["individual", "batch", "cross_encoder"], help="Rerank method"
     )
+    rrf_search_parser.add_argument("--debug", action="store_true", default=False, help="Enable debug")
+    rrf_search_parser.add_argument(
+        "--evaluate", action="store_true", default=False, help="LLM-evaluate result relevance (0-3)"
+    )
 
     args = parser.parse_args()
-
-    documents = load_data()
-
-    ii = InvertedIndex()
-    if not ii._index_file.exists():
-        ii.build()
-        ii.save()
-    else:
-        ii.load()
-    css = ChunkedSemanticSearch()
-    css.load_or_create_chunk_embeddings(documents)
-    hs = HybridSearch(inverted_index=ii, semantic_search=css)
-
-    load_dotenv()
-    api_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key) if api_key else None
-
-    rewriter = QueryRewriter(client=client) if client else None
-    reranker = SearchReranker(client=client)
+    if getattr(args, "debug", False):
+        logging.basicConfig(level=logging.WARNING, format="%(name)s: %(message)s")
+        logging.getLogger("rag_engine").setLevel(logging.DEBUG)
 
     match args.command:
         case "weighted-search":
-            results = hs.weighted_search(args.query, args.alpha, args.limit)
+            components = pipeline.build_pipeline()
+            results = components.hybrid_search.weighted_search(args.query, args.alpha, args.limit)
             for i, res in enumerate(results, start=1):
                 print(f"{i} {res['title']}")
                 print(f"  Hybrid Score: {res['hybrid_score']:.4f}")
@@ -70,43 +54,49 @@ def main() -> None:
                 print(f"  {res['description'][:40]}")
 
         case "rrf-search":
-            search_query = args.query
-            if args.enhance in ["spell", "rewrite", "expand"] and rewriter and rewriter.client:
-                search_query = rewriter.rewrite(args.query, mode=args.enhance)
-                if search_query != args.query:
-                    print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{search_query}'\n")
+            components = pipeline.build_pipeline()
+            run = pipeline.rrf_search(
+                components,
+                query=args.query,
+                k=args.k,
+                limit=args.limit,
+                enhance=args.enhance,
+                rerank_method=args.rerank_method,
+            )
 
-            initial_limit = args.limit * 5 if args.rerank_method else args.limit
-            results = hs.rrf_search(search_query, args.k, initial_limit)
+            if run.enhanced_query:
+                print(f"Enhanced query ({run.enhance_mode}): '{run.query}' -> '{run.enhanced_query}'\n")
 
-            is_reranked = False
-            if args.rerank_method:
-                is_reranked = True
-                print(f"Re-ranking top {len(results)} results using {args.rerank_method} method...")
-                results = reranker.rerank(search_query, results, mode=args.rerank_method)
-                results = results[: args.limit]
+            if run.rerank_method:
+                print(f"Re-ranking top {run.pre_rerank_count} results using {run.rerank_method} method...")
+                print(f"Reciprocal Rank Fusion Results for '{run.query}' (k={run.k}):\n")
 
-            if is_reranked:
-                print(f"Reciprocal Rank Fusion Results for '{args.query}' (k={args.k}):\n")
-
-            for i, res in enumerate(results[: args.limit], start=1):
+            for i, res in enumerate(run.results, start=1):
                 print(f"{i}. {res['title']}")
 
-                # Clean, mutually exclusive printing logic for each reranking mode
-                if args.rerank_method == "individual" and "rerank_score" in res:
+                if run.rerank_method == "individual" and "rerank_score" in res:
                     print(f"   Re-rank Score: {res['rerank_score']:.3f}/10")
-                elif args.rerank_method == "batch":
+                elif run.rerank_method == "batch":
                     print(f"   Re-rank Rank: {i}")
-                elif args.rerank_method == "cross_encoder" and "rerank_score" in res:
+                elif run.rerank_method == "cross_encoder" and "rerank_score" in res:
                     print(f"   Cross Encoder Score: {res['rerank_score']:.4f}")
 
                 print(f"   RRF Score: {res['hybrid_score']:.3f}")
                 print(f"   BM25 Rank: {res['bm_rank']}, Semantic Rank: {res['sem_rank']}")
                 print(f"   {res['description'][:97]}...\n")
 
+            if args.evaluate:
+                if not components.evaluator:
+                    print("\nEvaluation skipped: no GEMINI_API_KEY set.")
+                else:
+                    scored = components.evaluator.evaluate(run.query, run.results)
+                    print("\nEvaluation Report:")
+                    for i, (title, score) in enumerate(scored, start=1):
+                        print(f"{i}. {title}: {score}/3")
+
         case "search":
-            documents = load_data()
-            print(hs._bm25_search(args.text, args.limit))
+            components = pipeline.build_pipeline()
+            print(components.hybrid_search._bm25_search(args.text, args.limit))
 
         case "normalize":
             results = minmax_normalization(args.vector)
