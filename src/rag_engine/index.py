@@ -26,7 +26,7 @@ class InvertedIndex:
         self._index_file = self._cache_dir / "inverted_index.pkl"
         self._docmap_file = self._cache_dir / "docmap.pkl"
         self._term_frequencies_file = self._cache_dir / "term_frequencies.pkl"
-        self._doc_lengths = self._cache_dir / "doc_lengths.pkl"
+        self._doc_lengths_path = self._cache_dir / "doc_lengths.pkl"
 
     def __add_document(self, doc_id: int, text: str) -> None:
         tokens = tokenizer(text)
@@ -48,6 +48,8 @@ class InvertedIndex:
 
     def get_bm25_tf(self, doc_id: int, token: str) -> float:
         tf = self.get_tf(doc_id, token)
+        if self.avg_doc_length == 0:
+            return 0.0
         length_norm = 1 - BM25_B + BM25_B * (self.doc_lengths[doc_id] / self.avg_doc_length)
         return tf * (BM25_K1 + 1) / (tf + BM25_K1 * length_norm)
 
@@ -71,7 +73,7 @@ class InvertedIndex:
             pickle.dump(self.docmap, f)
         with self._term_frequencies_file.open("wb") as f:
             pickle.dump(self.term_frequencies, f)
-        with self._doc_lengths.open("wb") as f:
+        with self._doc_lengths_path.open("wb") as f:
             pickle.dump(self.doc_lengths, f)
         if self.doc_lengths:
             self.avg_doc_length = sum(self.doc_lengths.values()) / len(self.doc_lengths)
@@ -81,7 +83,7 @@ class InvertedIndex:
             not self._index_file.exists()
             or not self._docmap_file.exists()
             or not self._term_frequencies_file.exists()
-            or not self._doc_lengths.exists()
+            or not self._doc_lengths_path.exists()
         ):
             raise FileNotFoundError("inverted_index or docmap not found")
         with self._index_file.open("rb") as f:
@@ -90,7 +92,7 @@ class InvertedIndex:
             self.docmap = pickle.load(f)  # noqa: S301
         with self._term_frequencies_file.open("rb") as f:
             self.term_frequencies = pickle.load(f)  # noqa: S301
-        with self._doc_lengths.open("rb") as f:
+        with self._doc_lengths_path.open("rb") as f:
             self.doc_lengths = pickle.load(f)  # noqa: S301
         if self.doc_lengths:
             self.avg_doc_length = sum(self.doc_lengths.values()) / len(self.doc_lengths)

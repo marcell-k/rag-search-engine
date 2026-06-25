@@ -1,9 +1,10 @@
 Rate how relevant each result is to this query on a 0-3 scale:
 
-Query: "{query}"
+Query: 
+{query}
 
 Results:
-{chr(10).join(formatted_results)}
+{results}
 
 Scale:
 - 3: Highly relevant

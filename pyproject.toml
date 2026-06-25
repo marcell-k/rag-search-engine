@@ -30,6 +30,7 @@ keyword  = "rag_engine.cli.keyword:main"
 semantic = "rag_engine.cli.semantic:main"
 hybrid = "rag_engine.cli.hybrid:main"
 evaluation = "rag_engine.cli.evaluation:main"
+rag = "rag_engine.cli.rag:main"
 
 [tool.uv]
 package = true

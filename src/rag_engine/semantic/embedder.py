@@ -130,23 +130,30 @@ class ChunkedSemanticSearch(SemanticSearch):
         similarities = cosine_similarity(self.chunk_embeddings, query_embedding)
 
         # 3. Sort all similarities at once and grab the top indices
-        top_indices = np.argsort(similarities)[::-1][:limit]
-
-        # 4. Map the top indices back to their metadata and documents
+        sorted_indices = np.argsort(similarities)[::-1]
         results = []
-        for idx in top_indices:
+        seen_docs: set[int] = set()
+
+        for idx in sorted_indices:
             metadata = self.chunk_metadata[idx]
             movie_idx = metadata["movie_idx"]
             doc = self.documents[movie_idx]
-
+            doc_id = doc["id"]
+            if doc_id in seen_docs:
+                continue
+            seen_docs.add(doc_id)
             results.append(
                 {
-                    "doc_id": doc["id"],
+                    "doc_id": doc_id,
+                    "chunk_idx": metadata["chunk_idx"],
                     "score": float(similarities[idx]),
                     "title": doc["title"],
                     "description": doc["description"],
                 }
             )
+
+            if len(results) == limit:
+                break
 
         return results
 

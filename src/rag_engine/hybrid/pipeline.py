@@ -9,6 +9,7 @@ from google import genai
 from rag_engine.data_loader import load_data
 from rag_engine.hybrid.search import HybridSearch
 from rag_engine.index import InvertedIndex
+from rag_engine.llm import LLM
 from rag_engine.query_processing.evaluator import SearchEvaluator
 from rag_engine.query_processing.reranker import SearchReranker
 from rag_engine.query_processing.rewriter import QueryRewriter
@@ -24,8 +25,9 @@ class PipelineComponents:
     """Pre-built search backends and LLM helpers, ready for repeated queries."""
 
     hybrid_search: HybridSearch
+    llm: LLM | None
     rewriter: QueryRewriter | None
-    reranker: SearchReranker
+    reranker: SearchReranker | None
     evaluator: SearchEvaluator | None
 
 
@@ -63,11 +65,18 @@ def build_pipeline() -> PipelineComponents:
     api_key = os.environ.get("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key) if api_key else None
 
-    rewriter = QueryRewriter(client=client) if client else None
-    reranker = SearchReranker(client=client)
-    evaluator = SearchEvaluator(client) if client else None
+    llm = LLM(client) if client else None
+    rewriter = QueryRewriter(llm) if llm else None
+    reranker = SearchReranker(llm) if llm else None
+    evaluator = SearchEvaluator(llm) if llm else None
 
-    return PipelineComponents(hybrid_search=hybrid_search, rewriter=rewriter, reranker=reranker, evaluator=evaluator)
+    return PipelineComponents(
+        hybrid_search=hybrid_search,
+        llm=llm,
+        rewriter=rewriter,
+        reranker=reranker,
+        evaluator=evaluator,
+    )
 
 
 def rrf_search(
@@ -83,8 +92,8 @@ def rrf_search(
 
     search_query = query
     enhanced_query: str | None = None
-    if enhance in ("spell", "rewrite", "expand") and components.rewriter and components.rewriter.client:
-        search_query = components.rewriter.rewrite(query, mode=enhance)
+    if enhance in ("spell", "rewrite", "expand") and components.rewriter and components.llm:
+        search_query = components.rewriter.rewrite(query, mode="rewriting/" + enhance)
         if search_query != query:
             enhanced_query = search_query
     logger.debug("Query after enhancement: %r", search_query)
@@ -93,7 +102,7 @@ def rrf_search(
     results = components.hybrid_search.rrf_search(search_query, k, initial_limit)
 
     pre_rerank_count: int | None = None
-    if rerank_method:
+    if rerank_method and components.reranker:
         pre_rerank_count = len(results)
         results = components.reranker.rerank(search_query, results, mode=rerank_method)
         results = results[:limit]

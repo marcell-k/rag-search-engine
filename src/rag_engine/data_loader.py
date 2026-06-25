@@ -17,7 +17,7 @@ def load_data() -> list[Movie]:
 
 
 @lru_cache(maxsize=1)
-def load_golden():
+def load_golden() -> list:
     with Path(GOLDEN_DATASET_FILE).open() as f:
         data = json.load(f)
         return data["test_cases"]

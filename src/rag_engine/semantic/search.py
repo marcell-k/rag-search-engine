@@ -27,7 +27,7 @@ def fixed_size_chunking(text: str, chunk_size: int = 200, overlap: float = 0.2) 
     step_size = chunk_size - overlap_words
     for i in range(0, len(words), step_size):
         chunk_words = words[i : i + chunk_size]
-        if len(chunk_words) <= overlap_words:
+        if i > 0 and len(chunk_words) <= overlap_words:
             break
         chunks.append(" ".join(chunk_words))
     return chunks

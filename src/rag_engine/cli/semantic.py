@@ -33,11 +33,11 @@ def main() -> None:
 
     search_parser = subparsers.add_parser("search", help="Semantic search")
     search_parser.add_argument("query", type=str)
-    search_parser.add_argument("-limit", default=5)
+    search_parser.add_argument("-limit", type=int, default=5)
 
     chunk_parser = subparsers.add_parser("chunk")
     chunk_parser.add_argument("text", type=str)
-    chunk_parser.add_argument("--chunk_size", type=int, default="200")
+    chunk_parser.add_argument("--chunk_size", type=int, default=200)
     chunk_parser.add_argument("--overlap", type=float, default=0.2)
 
     semantic_chunk_parser = subparsers.add_parser("semantic_chunk")

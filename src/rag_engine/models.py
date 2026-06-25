@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import TypedDict
 
 
@@ -22,3 +23,11 @@ class HybridSearchResult(SearchResult, total=True):
     bm_rank: int | None
     sem_rank: int | None
     hybrid_rank: int | None
+
+
+@dataclass
+class SearchDocument:
+    doc_id: int
+    title: str
+    description: str
+    score: float

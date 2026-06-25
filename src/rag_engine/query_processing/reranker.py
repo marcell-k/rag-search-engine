@@ -4,15 +4,10 @@ import re
 import time
 from typing import TYPE_CHECKING, TypeVar
 
-from google.genai import types
-
-from rag_engine.config import PROJECT_ROOT
-
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from google import genai
-
+    from rag_engine.llm import LLM
     from rag_engine.models import SearchResult
 
 logger = logging.getLogger(__name__)
@@ -20,39 +15,20 @@ logger = logging.getLogger(__name__)
 _R = TypeVar("_R", bound="SearchResult")
 
 _RANKING_TAG_RE = re.compile(r"<ranking>(.*?)</ranking>", re.DOTALL)
-_CODE_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 
 class SearchReranker:
-    def __init__(self, client: genai.Client, model: str = "gemma-4-31b-it") -> None:
-        self.client = client
-        self.model = model
-
-    def _load_prompt(self, mode: str) -> str:
-        prompt_path = PROJECT_ROOT / "src" / "rag_engine" / "query_processing" / "prompts" / f"{mode}.md"
-        with prompt_path.open("r") as f:
-            return f.read().strip()
-
-    def _call_llm(self, prompt: str) -> str:
-        """Shared helper to call the LLM and aggressively clean markdown/whitespace."""
-        config = types.GenerateContentConfig(temperature=0.0)
-        response = self.client.models.generate_content(model=self.model, contents=prompt, config=config)
-
-        if response.text is None:
-            finish_reason = response.candidates[0].finish_reason if response.candidates else None
-            block_reason = getattr(response.prompt_feedback, "block_reason", None) if response.prompt_feedback else None
-            raise ValueError(f"LLM returned no text (finish_reason={finish_reason}, block_reason={block_reason}).")
-
-        return _CODE_FENCE_RE.sub("", response.text).strip()
+    def __init__(self, llm: LLM) -> None:
+        self.llm = llm
 
     def _rerank_individual(self, query: str, search_results: Sequence[_R], mode: str) -> list[_R]:
-        prompt_template = self._load_prompt(mode)
+        prompt_template = self.llm.load_prompt(f"reranking/{mode}")
         scored_results: list[tuple[float, _R]] = []
 
         for i, res in enumerate(search_results):
             formatted_prompt = prompt_template.format(query=query, title=res["title"], description=res["description"])
 
-            cleaned_score = self._call_llm(formatted_prompt)
+            cleaned_score = self.llm.generate(formatted_prompt)
             res_dict = dict(res)
             res_dict["rerank_score"] = float(cleaned_score)
 
@@ -69,10 +45,10 @@ class SearchReranker:
         doc_list_str = ""
         for res in search_results:
             doc_list_str += f"\nID: {res['doc_id']}\nTitle: {res['title']}\nDescription: {res['description']}\n"
-        prompt_template = self._load_prompt(mode)
+        prompt_template = self.llm.load_prompt("reranking/" + mode)
         formatted_prompt = prompt_template.format(query=query, doc_list_str=doc_list_str)
 
-        cleaned_text = self._call_llm(formatted_prompt)
+        cleaned_text = self.llm.generate(formatted_prompt)
 
         match = _RANKING_TAG_RE.search(cleaned_text)
         if match is None:
