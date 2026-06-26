@@ -9,9 +9,10 @@ if TYPE_CHECKING:
 
 
 class LLM:
-    def __init__(self, client: genai.Client, model: str = "gemma-4-31b-it") -> None:
+    def __init__(self, client: genai.Client, model: str = "gemma-4-31b-it", system_instruction: str = "") -> None:
         self.client = client
         self.model = model
+        self.system_instruction = system_instruction
 
     def load_prompt(self, name: str) -> str:
         path = PROJECT_ROOT / "src" / "rag_engine" / "query_processing" / "prompts" / f"{name}.md"
@@ -22,7 +23,7 @@ class LLM:
         if not self.client:
             raise RuntimeError("No LLM configured")
 
-        config = types.GenerateContentConfig(temperature=temperature)
+        config = types.GenerateContentConfig(temperature=temperature, system_instruction=self.system_instruction)
 
         response = self.client.models.generate_content(
             model=self.model,
@@ -30,10 +31,12 @@ class LLM:
             config=config,
         )
 
-        if not response.text:
-            raise ValueError("LLM returned no text")
-
-        return response.text.strip()
+        text = response.text
+        if not text:
+            candidate = response.candidates[0] if response.candidates else None
+            reason = getattr(getattr(candidate, "finish_reason", None), "name", "unknown")
+            raise ValueError(f"LLM returned no text (finish_reason={reason})")
+        return text.strip()
 
     def prompt(self, template_name: str, **kwargs) -> str:  # noqa: ANN003
         template = self.load_prompt(template_name)

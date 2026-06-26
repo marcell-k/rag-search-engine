@@ -18,7 +18,6 @@ def augment(query: str, limit: int = 5, mode: str = "") -> None:
 
     template = components.llm.load_prompt(mode)
     prompt = template.format(query=query, docs=docs)
-    answer = components.llm.generate(prompt)
 
     answer = components.llm.generate(prompt)
 

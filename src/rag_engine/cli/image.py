@@ -53,10 +53,10 @@ def main() -> None:
             ms.verify_image_embedding(args.image)
 
         case "search":
-            res = ms.search(args.image, args.limit)
+            res: list[dict[str, str | int | float]] = ms.search(args.image, args.limit)
             for i, r in enumerate(res, start=1):
                 print(f"{i}. {r['title']} (similarity: {r['score']:.3f}")
-                print(f"\t{r['description'][:40]}")
+                print(f"\t{r['description'][:40]}")  # type: ignore
 
         case _:
             parser.print_help()
