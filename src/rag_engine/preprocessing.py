@@ -9,6 +9,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STOP_WORDS = PROJECT_ROOT / "data" / "stopwords.txt"
 
 stemmer = PorterStemmer()
+CACHED_STOP_WORDS = set(load_stop_words())
 
 
 def clean_text(text: str) -> str:
@@ -19,8 +20,7 @@ def clean_text(text: str) -> str:
 
 def tokenizer(text: str) -> list[str]:
     text = clean_text(text)
-    stop_words = load_stop_words()
-    tokens = [stemmer.stem(tok) for tok in text.split() if tok not in stop_words]
+    tokens = [stemmer.stem(tok) for tok in text.split() if tok not in CACHED_STOP_WORDS]
     return tokens
 
 
