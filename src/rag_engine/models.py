@@ -1,5 +1,8 @@
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
+
+if TYPE_CHECKING:
+    from rag_engine.filing_types import FilingType
 
 
 class Movie(TypedDict):
@@ -57,7 +60,6 @@ type TopicTag = Literal[
 ]
 
 type PeriodType = Literal["FY", "Q1", "Q2", "Q3", "Q4"]
-type FilingType = Literal["10-K", "10-Q", "20-F", "8-K", "SC 13D", "SC 13G"]
 
 
 class ChunkMetadata(TypedDict):
@@ -93,3 +95,7 @@ class ChunkMetadata(TypedDict):
     is_footnote: bool
     is_boilerplate: bool
     contains_numbers: bool
+
+    # Citations
+    start_char: int
+    end_char: int
