@@ -9,10 +9,13 @@ wheels/
 # Virtual environments
 .venv
 
-data/
+data/*
 cache/
 uv.lock
 .ruff_cache
 
 .env
 .DS_Store
+
+!data/KO_0001628280-26-010047.json
+!data/KO_0001628280-26-010047.md
