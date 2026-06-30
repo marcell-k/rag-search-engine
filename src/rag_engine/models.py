@@ -57,6 +57,7 @@ type TopicTag = Literal[
     "executive_compensation",
     "cybersecurity",
     "liquidity_and_capital_resources",
+    "other",
 ]
 
 type PeriodType = Literal["FY", "Q1", "Q2", "Q3", "Q4"]

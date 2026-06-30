@@ -1,6 +1,25 @@
 from typing import Literal
 
-FilingType = Literal["10-K", "10-Q", "20-F", "8-K", "SC 13D", "SC 13G"]
+type FilingType = Literal["10-K", "10-Q", "20-F", "8-K", "SC 13D", "SC 13G"]
+
+type TopicTag = Literal[
+    "business",
+    "risk_factors",
+    "cybersecurity",
+    "properties",
+    "legal_proceedings",
+    "market_risk",
+    "mda",
+    "financial_statements",
+    "internal_controls",
+    "corporate_governance",
+    "executive_compensation",
+    "ownership",
+    "related_party_transactions",
+    "accounting",
+    "capital_structure",
+    "other",
+]
 
 _TITLES_10K: dict[str, str] = {
     "ITEM 1": "Business",
