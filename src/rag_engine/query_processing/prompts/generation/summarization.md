@@ -1,9 +1,7 @@
-Provide information useful to the query below by synthesizing data from multiple search results in detail.
+Provide information useful to the query below by synthesizing data from multiple filing excerpts in detail.
 
-The goal is to provide comprehensive information so that users know what their options are.
-Your response should be information-dense and concise, with several key pieces of information about the genre, plot, etc. of each movie.
-
-This should be tailored to Hoopla users. Hoopla is a movie streaming service.
+The goal is to give a clear picture of what the filings say, with key figures, dates, and disclosures called out.
+Your response should be information-dense and concise.
 
 Query: {query}
 
