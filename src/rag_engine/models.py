@@ -1,39 +1,29 @@
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:
     from rag_engine.filing_types import FilingType
 
 
-class Movie(TypedDict):
-    id: int
-    title: str
-    description: str
-
-
 class SearchResult(TypedDict):
-    doc_id: int
+    chunk_id: str
     score: float
-    title: str
-    description: str
+    content: str
+    cik: str
+    company_name: str
+    filing_type: FilingType
+    period_of_report: str | None
+    sec_item: str
+    sec_title: str
 
 
 class HybridSearchResult(SearchResult, total=True):
-    bm_score: float
-    sem_score: float
+    fts_score: float
+    vec_score: float
     hybrid_score: float
 
-    bm_rank: int | None
-    sem_rank: int | None
+    fts_rank: int | None
+    vec_rank: int | None
     hybrid_rank: int | None
-
-
-@dataclass
-class SearchDocument:
-    doc_id: int
-    title: str
-    description: str
-    score: float
 
 
 type TopicTag = Literal[
@@ -71,7 +61,6 @@ class ChunkMetadata(TypedDict):
 
     # Filing Identifiers
     filing_type: FilingType
-    filing_date: str  # Format: YYYY-MM-DD
     period_of_report: str | None  # Format: YYYY-MM-DD (End of Q1, Q2, Q3, or FY)
     period_type: PeriodType | None
     accession_number: str

@@ -72,7 +72,6 @@ def attach_metadata(chunks: list[RawChunk], header: dict) -> list[ChunkMetadata]
     res: list[ChunkMetadata] = []
     cik = header["cik"]
     accession_number = header["accession_number"]
-    filing_date = header.get("filing_date") or header.get("period_end") or "UNKNOWN"
 
     for i, chunk in enumerate(chunks):
         note_match = _NOTE_RE.search(chunk.text[:60])
@@ -85,7 +84,6 @@ def attach_metadata(chunks: list[RawChunk], header: dict) -> list[ChunkMetadata]
             "company_name": header["company_name"],
             "company_ticker": header["company_ticker"],
             "filing_type": header["filing_type"],
-            "filing_date": filing_date,
             "period_of_report": header["period_end"],
             "period_type": header["period_type"],
             "is_amendment": header.get("is_amendment", False),

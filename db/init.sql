@@ -14,7 +14,6 @@ CREATE TABLE chunks (
 
     -- Filing
     filing_type     VARCHAR(20)  NOT NULL,
-    filing_date     DATE         NOT NULL,
     period_of_report DATE,
     period_type     VARCHAR(10),
     accession_number VARCHAR(50) NOT NULL,
@@ -57,7 +56,6 @@ CREATE INDEX idx_chunks_fts      ON chunks USING GIN (fts_vector);
 
 -- Metadata filters (used in WHERE before ANN — dramatically reduces scan)
 CREATE INDEX idx_chunks_cik      ON chunks (cik);
-CREATE INDEX idx_chunks_filing   ON chunks (filing_type, filing_date);
 CREATE INDEX idx_chunks_period   ON chunks (period_of_report, period_type);
 CREATE INDEX idx_chunks_topics   ON chunks USING GIN (topics);
 CREATE INDEX idx_chunks_flags    ON chunks (is_table, is_footnote, is_boilerplate);

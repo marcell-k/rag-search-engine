@@ -1,5 +1,9 @@
 from typing import TYPE_CHECKING
 
+from psycopg.rows import dict_row
+
+from rag_engine.models import SearchResult
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -13,14 +17,14 @@ BATCH_SIZE = 500
 _UPSERT_SQL = """
 INSERT INTO chunks (
     chunk_id, chunk_index, cik, company_name, company_ticker,
-    filing_type, filing_date, period_of_report, period_type,
+    filing_type, period_of_report, period_type,
     accession_number, is_amendment, sec_item, sec_title,
     subsection_path, note_number, content, token_count,
     is_table, is_footnote, is_boilerplate, contains_numbers,
     topics, embedding
 ) VALUES (
     %(chunk_id)s, %(chunk_index)s, %(cik)s, %(company_name)s, %(company_ticker)s,
-    %(filing_type)s, %(filing_date)s, %(period_of_report)s, %(period_type)s,
+    %(filing_type)s, %(period_of_report)s, %(period_type)s,
     %(accession_number)s, %(is_amendment)s, %(sec_item)s, %(sec_title)s,
     %(subsection_path)s, %(note_number)s, %(content)s, %(token_count)s,
     %(is_table)s, %(is_footnote)s, %(is_boilerplate)s, %(contains_numbers)s,
@@ -31,7 +35,6 @@ ON CONFLICT (chunk_id) DO UPDATE SET
     company_name      = EXCLUDED.company_name,
     company_ticker    = EXCLUDED.company_ticker,
     filing_type       = EXCLUDED.filing_type,
-    filing_date       = EXCLUDED.filing_date,
     period_of_report  = EXCLUDED.period_of_report,
     period_type       = EXCLUDED.period_type,
     is_amendment      = EXCLUDED.is_amendment,
@@ -60,7 +63,6 @@ def _to_row(meta: ChunkMetadata, content: str, embedding: np.ndarray) -> dict:
         "company_name": meta["company_name"],
         "company_ticker": meta["company_ticker"],
         "filing_type": meta["filing_type"],
-        "filing_date": meta["filing_date"],
         "period_of_report": meta["period_of_report"],
         "period_type": meta["period_type"],
         "accession_number": meta["accession_number"],
@@ -109,3 +111,49 @@ class ChunkRepository:
             await conn.commit()
 
         return len(rows)
+
+    async def search_fts(self, query: str, limit: int = 50, cik: str | None = None) -> list[SearchResult]:
+        sql = """
+            SELECT chunk_id, content, cik, company_name, filing_type,
+                period_of_report, sec_item, sec_title,
+                ts_rank(fts_vector, websearch_to_tsquery('english', %(query)s)) AS score
+            FROM chunks
+            WHERE fts_vector @@ websearch_to_tsquery('english', %(query)s)
+            {cik_filter}
+            ORDER BY score DESC
+            LIMIT %(limit)s
+        """
+        params = {"query": query, "limit": limit}
+        cik_filter = ""
+        if cik:
+            cik_filter = "AND cik = %(cik)s"
+            params[cik] = cik
+
+        async with self.client.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(sql.format(cik_filter=cik_filter), params)
+            rows = await cur.fetchall()
+        return [SearchResult(**row) for row in rows]
+
+    async def search_vector(
+        self, query_embedding: np.ndarray, limit: int, cik: str | None = None
+    ) -> list[SearchResult]:
+        sql = """
+            SELECT chunk_id, content, cik, company_name, filing_type,
+                period_of_report, sec_item, sec_title,
+                1 - (embedding <=> %(query_embedding)s::vector) AS score
+            FROM chunks
+            {cik_filter}
+            ORDER BY embedding <=> %(query_embedding)s::vector
+            LIMIT %(limit)s
+        """
+        params = {"query_embedding": query_embedding.tolist(), "limit": limit}
+        cik_filter = ""
+        if cik:
+            cik_filter = "WHERE cik = %(cik)s"
+            params["cik"] = cik
+
+        async with self.client.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(sql.format(cik_filter=cik_filter), params)
+            rows = await cur.fetchall()
+
+        return [SearchResult(**row) for row in rows]
