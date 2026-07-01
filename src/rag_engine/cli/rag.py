@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 
 from rag_engine.generation.pipeline import augment
 
@@ -21,16 +22,16 @@ def main() -> None:
 
     match args.command:
         case "rag":
-            augment(args.query, args.limit, mode="generation/answer_question")
+            asyncio.run(augment(args.query, args.limit, mode="generation/answer_question"))
 
         case "summarize":
-            augment(args.query, args.limit, mode="generation/summarization")
+            asyncio.run(augment(args.query, args.limit, mode="generation/summarization"))
 
         case "citations":
-            augment(args.query, args.limit, mode="generation/answer_with_citations")
+            asyncio.run(augment(args.query, args.limit, mode="generation/answer_with_citations"))
 
         case "question":
-            augment(args.query, args.limit, mode="generation/answer_question_detailed")
+            asyncio.run(augment(args.query, args.limit, mode="generation/answer_question_detailed"))
 
         case _:
             parser.print_help()

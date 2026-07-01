@@ -30,13 +30,13 @@ packages = { find = { where = ["src", "."], include = ["rag_engine*", "db*"] } }
 
 
 [project.scripts]
-keyword  = "rag_engine.cli.keyword:main"
-semantic = "rag_engine.cli.semantic:main"
-hybrid = "rag_engine.cli.hybrid:main"
+rag    = "rag_engine.cli.rag:main"
+image  = "rag_engine.cli.image:main"
+agent  = "rag_engine.cli.agent:main"
+search = "rag_engine.cli.filing:main"
+chunk  = "rag_engine.embedding.chunker:main"
 evaluation = "rag_engine.cli.evaluation:main"
-rag = "rag_engine.cli.rag:main"
-image = "rag_engine.cli.image:main"
-agent = "rag_engine.cli.agent:main"
+
 
 [tool.uv]
 package = true

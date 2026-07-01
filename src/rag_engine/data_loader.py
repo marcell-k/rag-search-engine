@@ -1,19 +1,40 @@
 import json
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from rag_engine.config import GOLDEN_DATASET_FILE, MOVIES_FILE, STOPWORDS_FILE
-
-if TYPE_CHECKING:
-    from rag_engine.models import Movie
+from rag_engine.config import DATA_DIR, GOLDEN_DATASET_FILE, STOPWORDS_FILE
 
 
-@lru_cache(maxsize=1)
-def load_data() -> list[Movie]:
-    with Path(MOVIES_FILE).open() as f:
-        data = json.load(f)
-        return data["movies"]
+@dataclass
+class FilingPaths:
+    cik: str
+    accession: str
+    md_path: Path
+    header_path: Path
+
+
+def discover_filings(data_dir: Path = DATA_DIR) -> list[FilingPaths]:
+    filings: list[FilingPaths] = []
+    for cik_dir in sorted(data_dir.iterdir()):
+        if not cik_dir.is_dir() or cik_dir.name.startswith("."):
+            continue
+        for accession_dir in sorted(cik_dir.iterdir()):
+            if not accession_dir.is_dir():
+                continue
+            md_files = list(accession_dir.glob("*.md"))
+            json_files = list(accession_dir.glob("*.json"))
+            if not md_files or not json_files:
+                continue
+            filings.append(
+                FilingPaths(
+                    cik=cik_dir.name,
+                    accession=accession_dir.name,
+                    md_path=md_files[0],
+                    header_path=json_files[0],
+                )
+            )
+    return filings
 
 
 @lru_cache(maxsize=1)
