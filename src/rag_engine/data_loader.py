@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from rag_engine.config import DATA_DIR, GOLDEN_DATASET_FILE, STOPWORDS_FILE
+from rag_engine.config import DATA_DIR, GOLDEN_DATASET_FILE
 
 
 @dataclass
@@ -42,10 +42,3 @@ def load_golden() -> list:
     with Path(GOLDEN_DATASET_FILE).open() as f:
         data = json.load(f)
         return data["test_cases"]
-
-
-@lru_cache(maxsize=1)
-def load_stop_words() -> set[str]:
-    with Path(STOPWORDS_FILE).open() as f:
-        words = f.read().splitlines()
-    return set(words)

@@ -16,6 +16,7 @@ _ITEM_RE = re.compile(r"^#{1,3}\s*ITEM\s+(\d+[A-Z]?(?:\.\d+)?)\.?\s*(.*)$", re.I
 _ITEM_TITLES = build_item_title_lookup()
 _HEADING_RE = re.compile(r"^(#{1,3})\s+\S")
 
+_LIST_RE = re.compile(r"^\s*[-*•]\s+")
 
 MIN_CHUNK_CHARS = 30
 TEXT_CHUNK_OVERLAP = 0.2
@@ -44,7 +45,7 @@ def _is_unmatched_heading(line: str) -> bool:
     match = _HEADING_RE.match(line)
     if match is None or _match_item_header(line) is not None:
         return False
-    return len(match.group(1)) <= 2
+    return len(match.group(1)) <= 3
 
 
 def _merge_short_pieces(pieces: list[str], min_chars: int) -> list[str]:
@@ -84,6 +85,7 @@ def build_filing_chunks(text: str, semantic_chunker: SemanticChunk) -> list[RawC
     chunks: list[RawChunk] = []
     text_buffer: list[str] = []
     table_buffer: list[str] = []
+    list_buffer: list[str] = []
     in_table = False
 
     current_item: str | None = None
@@ -99,12 +101,29 @@ def build_filing_chunks(text: str, semantic_chunker: SemanticChunk) -> list[RawC
             )
             table_buffer.clear()
 
+    def flush_list() -> None:
+        if list_buffer:
+            list_text = "\n".join(list_buffer)
+            if chunks and not chunks[-1].is_table and chunks[-1].sec_item == current_item:
+                chunks[-1] = RawChunk(
+                    text=f"{chunks[-1].text}\n{list_text}",
+                    is_table=False,
+                    sec_item=chunks[-1].sec_item,
+                    sec_title=chunks[-1].sec_title,
+                )
+            else:
+                chunks.append(RawChunk(text=list_text, is_table=False, sec_item=current_item, sec_title=current_title))
+            list_buffer.clear()
+
+    text = re.sub(r"(?<=[.!?])[\"'”’)\]]?\s+(?=#{1,3}\s)", "\n", text)  # noqa: RUF001
     for line in text.split("\n"):
         is_table_line = line.startswith("|")
+        is_list_line = bool(_LIST_RE.match(line))
 
         if is_table_line:
             if not in_table:
                 flush_text()
+                flush_list()
                 in_table = True
             table_buffer.append(line)
             continue
@@ -113,14 +132,23 @@ def build_filing_chunks(text: str, semantic_chunker: SemanticChunk) -> list[RawC
             flush_table()
             in_table = False
 
+        if is_list_line:
+            flush_text()
+            list_buffer.append(line)
+            continue
+        elif list_buffer:
+            flush_list()
+
         header = _match_item_header(line)
         if header is not None:
             flush_text()
+            flush_list()
             current_item, current_title = header
             continue
 
         if _is_unmatched_heading(line):
             flush_text()
+            flush_list()
             current_item, current_title = None, None
             continue
 
@@ -130,6 +158,7 @@ def build_filing_chunks(text: str, semantic_chunker: SemanticChunk) -> list[RawC
         flush_table()
     else:
         flush_text()
+        flush_list()
 
     return chunks
 
@@ -166,27 +195,30 @@ async def run() -> None:
     await client.connect()
     try:
         repo = ChunkRepository(client)
-        for filing in discover_filings():
+        filings = discover_filings()
+        for filing in filings[:1]:
             data = filing.md_path.read_text()
+            print(f"{filing.cik}/{filing.accession}: {len(data)} chars, first 200: {data[:200]!r}")
             header = load_filing_header(filing.header_path)
 
             chunks = build_filing_chunks(data, semantic_chunker)
 
-            # n_tables = sum(c.is_table for c in chunks)
-            # print(f"{len(chunks)} chunks ({n_tables} tables, {len(chunks) - n_tables} text)")
-            # for c in chunks[:5]:
-            #     print(f"[{c.sec_item}] is_table={c.is_table} len={len(c.text)}")
-            #
-            # r = []
-            # rtable = []
-            # rtext = []
-            # for c in chunks:
-            #     r.append(len(c.text))
-            #     if c.is_table:
-            #         rtable.append(len(c.text))
-            #     else:
-            #         rtext.append(len(c.text))
-            #
+            n_tables = sum(c.is_table for c in chunks)
+            print(f"{len(chunks)} chunks ({n_tables} tables, {len(chunks) - n_tables} text)")
+            for c in chunks[:5]:
+                print(f"[{c.sec_item}] is_table={c.is_table} len={len(c.text)}")
+
+            r = []
+            rtable = []
+            rtext = []
+            for c in chunks:
+                r.append(len(c.text))
+                if c.is_table:
+                    rtable.append(len(c.text))
+                else:
+                    rtext.append(len(c.text))
+
+            meta = attach_metadata(chunks, header)
             # def print_stat(data: list[int]) -> None:
             #     print(f"Mean:   {np.mean(data):.2f}")
             #     print(f"Median: {np.median(data):.2f}")
@@ -212,15 +244,14 @@ async def run() -> None:
             # print("Text")
             # print_stat(rtext)
             # print("---\n")
-
-            meta = attach_metadata(chunks, header)
-            topics = []
-            for chunk in chunks:
-                chunk_embedding = semantic_chunker.generate_embedding(chunk.text)
-                topics.append(assign_topics(chunk.sec_item, chunk_embedding, semantic_chunker))
-            for m, t in zip(meta, topics, strict=True):
-                m["topics"] = t
-
+            #
+            # topics = []
+            # for chunk in chunks:
+            #     chunk_embedding = semantic_chunker.generate_embedding(chunk.text)
+            #     topics.append(assign_topics(chunk.sec_item, chunk_embedding, semantic_chunker))
+            # for m, t in zip(meta, topics, strict=True):
+            #     m["topics"] = t
+            #
             # print("\nTags per Chunk Distribution:")
             # tag_counts = [len(t) for t in topics]
             # tag_distribution = Counter(tag_counts)
@@ -243,15 +274,29 @@ async def run() -> None:
             # print("Footnote chunks:", sum(1 for x in meta if x["is_footnote"]))
 
             chunk_texts = [c.text for c in chunks]
-            embeddings = embed_chunks(chunk_texts, semantic_chunker)
-            # print(f"Embeddings shape: {embeddings.shape}")
 
-            if len(meta) != len(chunk_texts) or len(meta) != embeddings.shape[0]:
-                raise ValueError(f"count mismatch: {len(meta)} vs {len(chunk_texts)} vs {embeddings.shape[0]}")
+            # Format each chunk with its corresponding metadata
+            formatted_chunks = []
+            for c, m in zip(chunks, meta, strict=True):
+                # Format the metadata dictionary into a readable string
+                metadata_str = "\n".join(f"  {k}: {v}" for k, v in m.items())
 
-            rows = repo.build_rows(meta, chunk_texts, list(embeddings))
-            n_written = await repo.upsert_chunks(rows)
-            print(f"[{filing.cik}/{filing.accession}] upserted {n_written} chunks")
+                # Combine the text and its metadata block
+                chunk_block = f"{c.text}\n\nMetadata:\n{metadata_str}"
+                formatted_chunks.append(chunk_block)
+
+            # Write the formatted blocks separated by your delimiter
+            with open("extracted_chunks.txt", "w", encoding="utf-8") as f:
+                f.write("\n\n---\n\n".join(formatted_chunks))
+            # embeddings = embed_chunks(chunk_texts, semantic_chunker)
+            # # print(f"Embeddings shape: {embeddings.shape}")
+            #
+            # if len(meta) != len(chunk_texts) or len(meta) != embeddings.shape[0]:
+            #     raise ValueError(f"count mismatch: {len(meta)} vs {len(chunk_texts)} vs {embeddings.shape[0]}")
+            #
+            # rows = repo.build_rows(meta, chunk_texts, list(embeddings))
+            # n_written = await repo.upsert_chunks(rows)
+            # print(f"[{filing.cik}/{filing.accession}] upserted {n_written} chunks")
     finally:
         await client.disconnect()
 

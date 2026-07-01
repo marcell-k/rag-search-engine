@@ -45,7 +45,17 @@ class SemanticChunk:
                 chunks.append(" ".join(group))
                 continue
             prev_group = groups[idx - 1]
-            n_overlap = max(1, round(len(prev_group) * overlap))
-            overlap_sentences = prev_group[-n_overlap:]
+            prev_text = " ".join(prev_group)
+            char_budget = round(len(prev_text) * overlap)
+
+            overlap_sentences: list[str] = []
+            running = 0
+            for sent in reversed(prev_group):
+                if running + len(sent) > char_budget and overlap_sentences:
+                    break
+                overlap_sentences.insert(0, sent)
+                running += len(sent)
+                if len(overlap_sentences) >= len(prev_group) - 1:
+                    break
             chunks.append(" ".join(overlap_sentences + group))
         return chunks
