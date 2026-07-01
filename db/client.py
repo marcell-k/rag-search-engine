@@ -2,6 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
+from dotenv import load_dotenv
 from psycopg_pool import AsyncConnectionPool
 
 if TYPE_CHECKING:
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
 
 class DatabaseClient:
     def __init__(self) -> None:
+        load_dotenv()
         self.conninfo = os.getenv("DATABASE_URL")
         assert isinstance(self.conninfo, str)
 

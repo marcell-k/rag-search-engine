@@ -26,7 +26,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = { find = { where = ["src"] } }
+packages = { find = { where = ["src", "."], include = ["rag_engine*", "db*"] } }
+
 
 [project.scripts]
 keyword  = "rag_engine.cli.keyword:main"

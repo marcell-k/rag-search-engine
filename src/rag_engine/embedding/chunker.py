@@ -1,7 +1,12 @@
+import asyncio
 import re
 from collections import Counter
 from dataclasses import dataclass
 
+import numpy as np
+
+from db.client import DatabaseClient
+from db.repository import ChunkRepository
 from rag_engine.config import DATA_DIR
 from rag_engine.embedding.metadata import attach_metadata, load_filing_header
 from rag_engine.embedding.semantic import SemanticChunk
@@ -159,7 +164,13 @@ def chunking(text: str) -> tuple[list[list[str]], list[str]]:
     return table_chunks, semantic_chunks
 
 
-def main() -> None:
+def embed_chunks(chunks: list[str], sc: SemanticChunk) -> np.ndarray:
+    if not chunks:
+        return np.empty((0, 384))
+    return sc.model.encode(chunks, convert_to_numpy=True, show_progress_bar=True)
+
+
+async def main() -> None:
     data = load_data()
 
     semantic_chunker = SemanticChunk()
@@ -264,6 +275,25 @@ def main() -> None:
     print("Table chunks:", sum(1 for x in meta if x["is_table"]))
     print("Footnote chunks:", sum(1 for x in meta if x["is_footnote"]))
 
+    chunk_texts = [c.text for c in chunks]
+    embeddings = embed_chunks(chunk_texts, semantic_chunker)
+    print(f"Embeddings shape: {embeddings.shape}")
+
+    if len(meta) != len(chunk_texts) or len(meta) != embeddings.shape[0]:
+        raise ValueError(
+            f"meta/text/embedding count mismatch: {len(meta)} vs {len(chunk_texts)} vs {embeddings.shape[0]}"
+        )
+
+    client = DatabaseClient()
+    await client.connect()
+    try:
+        repo = ChunkRepository(client)
+        rows = repo.build_rows(meta, chunk_texts, list(embeddings))
+        n_written = await repo.upsert_chunks(rows)
+        print(f"Upserted {n_written} chunks into Postgres")
+    finally:
+        await client.disconnect()
+
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
