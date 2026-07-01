@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from rag_engine.semantic.vector_db import cosine_similarity
+from rag_engine.embedding.utils import cosine_similarity_batch
 
 if TYPE_CHECKING:
     from rag_engine.embedding.semantic import SemanticChunk
@@ -61,7 +61,7 @@ def classify_by_embedding(
     chunk_embedding: np.ndarray, semantic_chunker: SemanticChunk, threshold: float = SIMILARITY_THRESHOLD
 ) -> list[TopicTag]:
     labels, topic_vectors = _topic_embeddings(semantic_chunker)
-    sim = cosine_similarity(topic_vectors, chunk_embedding)
+    sim = cosine_similarity_batch(topic_vectors, chunk_embedding)
     matches: list[TopicTag] = [labels[i] for i in np.where(sim >= threshold)[0]]
     return matches if matches else []
 

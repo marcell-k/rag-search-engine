@@ -115,7 +115,8 @@ def _generate_answer(query: str, results: list[SearchResult], llm: LLM) -> str:
         return "I couldn't find any relevant movies for your query."
 
     docs = "\n\n".join(
-        f"[{i}] Title: {r['title']}\nDescription: {r['description']}" for i, r in enumerate(results, start=1)
+        f"[{i}] {r['company_name']} {r['filing_type']} — {r['sec_title']}\n{r['content']}"
+        for i, r in enumerate(results, start=1)
     )
 
     template = llm.load_prompt("agent/generate")

@@ -6,7 +6,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from rag_engine.hybrid.pipeline import PipelineComponents
-    from rag_engine.models import HybridSearchResult, Movie, SearchResult
+
+    from rag_engine.models import ChunkMetadata, HybridSearchResult, SearchResult
 
 
 @dataclass
@@ -18,7 +19,7 @@ class AgentTool:
 
 def build_tools(
     components: PipelineComponents,
-    documents: list[Movie],
+    documents: list[ChunkMetadata],
 ) -> dict[str, AgentTool]:
     """Build the tool registry from live pipeline components and the document corpus."""
 
@@ -53,11 +54,11 @@ def build_tools(
     def regex_search(pattern: str) -> list[SearchResult]:
         return _regex_over_corpus(pattern)
 
-    def genre_search(genre: str) -> list[SearchResult]:
-        return _regex_over_corpus(genre)
+    def topic_search(topic: str) -> list[SearchResult]:
+        return _regex_over_corpus(topic)
 
-    def actor_search(actor: str) -> list[SearchResult]:
-        return _regex_over_corpus(actor)
+    def item_search(item: str) -> list[SearchResult]:
+        return _regex_over_corpus(item)
 
     def hybrid_rrf_search(query: str) -> list[HybridSearchResult]:
         return components.hybrid_search.rrf_search(query, k=60, limit=10)

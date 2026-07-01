@@ -26,7 +26,7 @@ class SearchReranker:
         scored_results: list[tuple[float, _R]] = []
 
         for i, res in enumerate(search_results):
-            formatted_prompt = prompt_template.format(query=query, title=res["title"], description=res["description"])
+            formatted_prompt = prompt_template.format(query=query, title=res["sec_title"], description=res["content"])
 
             cleaned_score = self.llm.generate(formatted_prompt)
             res_dict = dict(res)
@@ -35,7 +35,7 @@ class SearchReranker:
             scored_results.append((res_dict["rerank_score"], res_dict))  # type: ignore
 
             if i < len(search_results) - 1:
-                logger.info("Waiting 5 seconds before scoring next movie to respect rate limits...")
+                logger.info("Waiting 5 seconds before scoring next chunk to respect rate limits...")
                 time.sleep(5)
 
         scored_results.sort(key=lambda x: x[0], reverse=True)
@@ -44,7 +44,7 @@ class SearchReranker:
     def _rerank_batch(self, query: str, search_results: Sequence[_R], mode: str) -> list[_R]:
         doc_list_str = ""
         for res in search_results:
-            doc_list_str += f"\nID: {res['doc_id']}\nTitle: {res['title']}\nDescription: {res['description']}\n"
+            doc_list_str += f"\nID: {res['chunk_id']}\nTitle: {res['sec_title']}\nContent: {res['content']}\n"
         prompt_template = self.llm.load_prompt("reranking/" + mode)
         formatted_prompt = prompt_template.format(query=query, doc_list_str=doc_list_str)
 
@@ -56,15 +56,15 @@ class SearchReranker:
 
         ranked_ids = json.loads(match.group(1).strip())
 
-        res_map = {res["doc_id"]: res for res in search_results}
+        res_map = {res["chunk_id"]: res for res in search_results}
         ranked_results = []
-        for doc_id in ranked_ids:
-            if doc_id in res_map:
-                ranked_results.append(res_map[doc_id])
+        for chunk_id in ranked_ids:
+            if chunk_id in res_map:
+                ranked_results.append(res_map[chunk_id])
 
         seen_ids = set(ranked_ids)
         for res in search_results:
-            if res["doc_id"] not in seen_ids:
+            if res["chunk_id"] not in seen_ids:
                 ranked_results.append(res)
 
         return ranked_results
@@ -74,7 +74,7 @@ class SearchReranker:
 
         cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
 
-        pairs = [[query, f"{res['title']} - {res['description'][:300]}"] for res in search_results]
+        pairs = [[query, f"{res['sec_title']} - {res['content'][:300]}"] for res in search_results]
         scores = cross_encoder.predict(pairs)
 
         scored_results = []
@@ -88,7 +88,7 @@ class SearchReranker:
         return scored_results
 
     def rerank(self, query: str, search_results: Sequence[_R], mode: str) -> list[_R]:
-        """Wrap handle the try/except logic and route to the correct reranking strategy."""
+        """Wrap try/except, route to correct reranking strategy."""
         try:
             if mode == "batch":
                 return self._rerank_batch(query, search_results, mode)
