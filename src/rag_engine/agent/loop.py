@@ -71,7 +71,7 @@ def _pick_tool(
     )
 
     results_preview = (
-        "\n".join(f"  [{i}] {r['title']}" for i, r in enumerate(all_results[:8], start=1))
+        "\n".join(f"  [{i}] {r['sec_title']}" for i, r in enumerate(all_results[:8], start=1))
         if all_results
         else "  (none yet)"
     )
@@ -112,7 +112,7 @@ def _pick_tool(
 
 def _generate_answer(query: str, results: list[SearchResult], llm: LLM) -> str:
     if not results:
-        return "I couldn't find any relevant movies for your query."
+        return "I couldn't find any relevant filing excerpts for your query."
 
     docs = "\n\n".join(
         f"[{i}] {r['company_name']} {r['filing_type']} — {r['sec_title']}\n{r['content']}"
@@ -134,12 +134,12 @@ def _generate_answer(query: str, results: list[SearchResult], llm: LLM) -> str:
 # ------------------------------------------------------------------ #
 
 
-def run_agent(
+async def run_agent(
     query: str, tools: dict[str, AgentTool], llm: LLM, limit: int = 5, max_iterations: int = MAX_ITERATIONS
 ) -> AgentRun:
-    """Run the agentic search loop and return a fully populated AgentRun."""
+    """Run agentic search loop, return populated AgentRun."""
     run = AgentRun(query=query)
-    seen_ids: set[int] = set()
+    seen_ids: set[str] = set()
 
     for step in range(1, max_iterations + 1):
         tool_call = _pick_tool(query, run.iterations, run.results, tools, llm)
@@ -157,11 +157,11 @@ def run_agent(
             break
 
         tool = tools[tool_call.tool]
-        raw_results = tool.fn(tool_call.query)
+        raw_results = await tool.fn(tool_call.query)
 
-        new_results = [r for r in raw_results if r["doc_id"] not in seen_ids]
+        new_results = [r for r in raw_results if r["chunk_id"] not in seen_ids]
         for r in new_results:
-            seen_ids.add(r["doc_id"])
+            seen_ids.add(r["chunk_id"])
         run.results.extend(new_results)
 
         run.iterations.append(

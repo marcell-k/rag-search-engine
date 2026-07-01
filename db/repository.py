@@ -157,3 +157,45 @@ class ChunkRepository:
             rows = await cur.fetchall()
 
         return [SearchResult(**row) for row in rows]
+
+    async def search_by_topic(self, topic: str, limit: int) -> list[SearchResult]:
+        sql = """
+            SELECT chunk_id, content, cik, company_name, filing_type,
+                   filing_date, period_of_report, sec_item, sec_title,
+                   1.0 AS score
+            FROM chunks
+            WHERE topics @> ARRAY[%(topic)s]
+            LIMIT %(limit)s
+        """
+        async with self.client.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(sql, {"topic": topic, "limit": limit})
+            rows = await cur.fetchall()
+        return [SearchResult(**row) for row in rows]
+
+    async def search_by_item(self, item: str, limit: int) -> list[SearchResult]:
+        sql = """
+            SELECT chunk_id, content, cik, company_name, filing_type,
+                   filing_date, period_of_report, sec_item, sec_title,
+                   1.0 AS score
+            FROM chunks
+            WHERE sec_item = %(item)s
+            LIMIT %(limit)s
+        """
+        async with self.client.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(sql, {"item": item, "limit": limit})
+            rows = await cur.fetchall()
+        return [SearchResult(**row) for row in rows]
+
+    async def search_by_filer(self, cik_or_ticker: str, limit: int) -> list[SearchResult]:
+        sql = """
+            SELECT chunk_id, content, cik, company_name, filing_type,
+                   filing_date, period_of_report, sec_item, sec_title,
+                   1.0 AS score
+            FROM chunks
+            WHERE cik = %(val)s OR %(val)s = ANY(company_ticker)
+            LIMIT %(limit)s
+        """
+        async with self.client.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute(sql, {"val": cik_or_ticker, "limit": limit})
+            rows = await cur.fetchall()
+        return [SearchResult(**row) for row in rows]

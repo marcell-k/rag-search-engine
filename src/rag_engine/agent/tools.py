@@ -1,108 +1,80 @@
-import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Awaitable, Callable, Sequence
 
-    from rag_engine.hybrid.pipeline import PipelineComponents
-
-    from rag_engine.models import ChunkMetadata, HybridSearchResult, SearchResult
+    from db.repository import ChunkRepository
+    from rag_engine.embedding.semantic import SemanticChunk
+    from rag_engine.models import HybridSearchResult, SearchResult
 
 
 @dataclass
 class AgentTool:
     name: str
     description: str
-    fn: Callable[[str], Sequence[SearchResult]]
+    fn: Callable[[str], Awaitable[Sequence[SearchResult]]]
 
 
-def build_tools(
-    components: PipelineComponents,
-    documents: list[ChunkMetadata],
-) -> dict[str, AgentTool]:
-    """Build the tool registry from live pipeline components and the document corpus."""
+def build_tools(cr: ChunkRepository, sc: SemanticChunk) -> dict[str, AgentTool]:
+    """Build tool registry from live repo + embedder."""
 
-    def _regex_over_corpus(pattern: str) -> list[SearchResult | HybridSearchResult]:
-        """Scan every document's title + description with a regex pattern."""
-        results: list[SearchResult] = []
-        try:
-            compiled = re.compile(pattern, re.IGNORECASE)
-        except re.error:
-            return results
+    async def fts_search(query: str) -> list[SearchResult]:
+        return await cr.search_fts(query, limit=10)
 
-        for doc in documents:
-            if compiled.search(f"{doc['title']} {doc['description']}"):
-                results.append(
-                    {
-                        "doc_id": doc["id"],
-                        "score": 1.0,
-                        "title": doc["title"],
-                        "description": doc["description"],
-                    }
-                )
-        return results[:10]
+    async def vector_search(query: str) -> list[SearchResult]:
+        embedding = sc.generate_embedding(query)
+        return await cr.search_vector(embedding, limit=10)
 
-    def keyword_search(query: str) -> list[SearchResult]:
-        from rag_engine.keyword.search import bm25_search
+    async def hybrid_search(query: str) -> list[HybridSearchResult]:
+        from rag_engine.filing_search.pipeline import search_hybrid
 
-        return bm25_search(components.hybrid_search.ii, query, limit=10)
+        return await search_hybrid(query, cik=None, sc=sc, cr=cr, limit=10)
 
-    def semantic_search(query: str) -> list[SearchResult]:
-        return components.hybrid_search.semantic_search.search_chunks(query, limit=10)
+    async def topic_search(topic: str) -> list[SearchResult]:
+        return await cr.search_by_topic(topic, limit=10)
 
-    def regex_search(pattern: str) -> list[SearchResult]:
-        return _regex_over_corpus(pattern)
+    async def item_search(item: str) -> list[SearchResult]:
+        return await cr.search_by_item(item, limit=10)
 
-    def topic_search(topic: str) -> list[SearchResult]:
-        return _regex_over_corpus(topic)
-
-    def item_search(item: str) -> list[SearchResult]:
-        return _regex_over_corpus(item)
-
-    def hybrid_rrf_search(query: str) -> list[HybridSearchResult]:
-        return components.hybrid_search.rrf_search(query, k=60, limit=10)
+    async def filer_search(cik_or_ticker: str) -> list[SearchResult]:
+        return await cr.search_by_filer(cik_or_ticker, limit=10)
 
     return {
         "hybrid_search": AgentTool(
             name="hybrid_search",
             description=(
-                "Hybrid BM25 + semantic search fused with RRF. Best all-round tool — "
+                "FTS + vector search fused with RRF. Best all-round tool — "
                 "use this first; fall back to narrower tools only if results are weak."
             ),
-            fn=hybrid_rrf_search,
+            fn=hybrid_search,
         ),
-        "keyword_search": AgentTool(
-            name="keyword_search",
-            description=("BM25 keyword search. Best for specific terms, movie titles, or character names."),
-            fn=keyword_search,
+        "search_fts": AgentTool(
+            name="search_fts",
+            description="Full-text search. Best for exact terms, defined phrases, or specific figures.",
+            fn=fts_search,
         ),
-        "semantic_search": AgentTool(
-            name="semantic_search",
+        "search_vector": AgentTool(
+            name="search_vector",
+            description="Embedding-based semantic search.",
+            fn=vector_search,
+        ),
+        "topic_search": AgentTool(
+            name="topic_search",
             description=(
-                "Embedding-based semantic search. Best for themes, moods, "
-                "and abstract concepts like 'survival' or 'redemption'."
+                "Filter chunks by topic tag: revenue_recognition, leases, debt, income_taxes, "
+                "risk_factors, cybersecurity, legal_proceedings, etc."
             ),
-            fn=semantic_search,
+            fn=topic_search,
         ),
-        "regex_search": AgentTool(
-            name="regex_search",
-            description=(
-                "Regex pattern match across title and description. Best for "
-                "specific phrases like 'bear attack' or 'wilderness survival'."
-            ),
-            fn=regex_search,
+        "item_search": AgentTool(
+            name="item_search",
+            description="Filter chunks by SEC item number (e.g. 'ITEM 1A', 'ITEM 7', 'ITEM 9A').",
+            fn=item_search,
         ),
-        "genre_search": AgentTool(
-            name="genre_search",
-            description=(
-                "Filter movies by genre keyword: horror, thriller, comedy, adventure, drama, sci-fi, romance, etc."
-            ),
-            fn=genre_search,
-        ),
-        "actor_search": AgentTool(
-            name="actor_search",
-            description="Find movies that mention a specific actor by name.",
-            fn=actor_search,
+        "filer_search": AgentTool(
+            name="filer_search",
+            description="Find chunks by company CIK or ticker.",
+            fn=filer_search,
         ),
     }
