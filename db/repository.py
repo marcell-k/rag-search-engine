@@ -127,7 +127,7 @@ class ChunkRepository:
         cik_filter = ""
         if cik:
             cik_filter = "AND cik = %(cik)s"
-            params[cik] = cik
+            params["cik"] = cik
 
         async with self.client.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
             await cur.execute(sql.format(cik_filter=cik_filter), params)

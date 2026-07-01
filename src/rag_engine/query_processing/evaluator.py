@@ -20,7 +20,6 @@ class SearchEvaluator:
         formatted = self._format_results(results)
 
         prompt = template.format(query=query, results="\n".join(formatted))
-        prompt = prompt.replace("{query}", query)
 
         cleaned = self.llm.generate(prompt)
         scores: list[int] = json.loads(cleaned)
